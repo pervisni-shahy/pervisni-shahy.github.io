@@ -696,12 +696,33 @@ let board=[], turn='white', sel=null, possible=[], lastMove=null;
 let epTarget=null, gameOver=false, vsAI=false;
 let drawOffered=false, drawBy=null, surColor=null;
 let fmn=1; // full move number for log
+let halfMoveClock=0;  // resets on capture or pawn move (50-move rule)
+let posHistory={};    // position key -> count (threefold repetition)
 
 // History for replay
 let history=[]; // [{board, from, to, turn, ep, check}]
 let replayIdx=-1; // -1 = live / not replaying
 
 function snapBoard(b) { return b.map(r=>r.map(c=>c?{...c}:null)); }
+
+function posKey(b, turn, ep) {
+  // Compact board string + turn + en-passant column
+  let k = turn[0]; // 'w' or 'b'
+  const sym = {king:'K',queen:'Q',pawn:'P'};
+  const col = {white:'W',black:'B'};
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+    const p=b[r][c];
+    k += p ? col[p.color]+sym[p.type||'?'] : '.';
+  }
+  k += ep ? ep.col : '-';
+  return k;
+}
+
+function recordPosition(b, turn, ep) {
+  const k = posKey(b, turn, ep);
+  posHistory[k] = (posHistory[k]||0) + 1;
+  return posHistory[k];
+}
 
 // ================================================================
 //  BOARD SETUP
@@ -916,6 +937,10 @@ function execMove(from,to,m,isAI=false){
   const promoted=board[to.row][to.col]?.type==='queen'&&piece.type==='pawn';
   lastMove={from,to};
 
+  // 50-move rule: reset on capture or pawn move
+  if(isCapture||piece.type==='pawn') halfMoveClock=0;
+  else halfMoveClock++;
+
   // Log
   const sym={white:{king:'♔',queen:'♕',pawn:'♙'},black:{king:'♚',queen:'♛',pawn:'♟'}};
   const s=`${piece.color==='white'?`${fmn}. `:''}${sym[piece.color][piece.type]} ${toAN(from.row,from.col)}${isCapture?'×':'-'}${toAN(to.row,to.col)}${promoted?' =♕ (пішень→ферзь)':''}`;
@@ -929,6 +954,25 @@ function execMove(from,to,m,isAI=false){
   if(promoted) playPromotion();
   else if(isCapture) playCapture();
   else playMove();
+
+  // ── 50-MOVE RULE ─────────────────────────────────────────
+  if(halfMoveClock>=100){ // 100 half-moves = 50 full moves
+    history.push({board:snapBoard(board),from:null,to:null,turn,ep:{},check:false});
+    addLog('= Нічия — правило 50 ходів','eg'); gameOver=true;
+    renderBoard(board,null,[],lastMove,null); updateUI();
+    setTimeout(()=>showResult('Нічия','Правило 50 ходів: жодного взяття чи ходу пішнем','⏱'),400);
+    return;
+  }
+
+  // ── THREEFOLD REPETITION ──────────────────────────────────
+  const repCount = recordPosition(board, turn, epTarget);
+  if(repCount>=3){
+    history.push({board:snapBoard(board),from:null,to:null,turn,ep:{},check:false});
+    addLog('= Нічия — потрійне повторення','eg'); gameOver=true;
+    renderBoard(board,null,[],lastMove,null); updateUI();
+    setTimeout(()=>showResult('Нічия','Позиція повторилась тричі','🔄'),400);
+    return;
+  }
 
   if(chk&&!hasMvs){
     // Checkmate - save final state too
@@ -1152,6 +1196,7 @@ function startGame(ai){
   sel=null; possible=[]; lastMove=null; epTarget=null;
   gameOver=false; drawOffered=false; drawBy=null;
   fmn=1; history=[]; replayIdx=-1;
+  halfMoveClock=0; posHistory={};
   document.getElementById('log').innerHTML='';
   document.getElementById('ov-result').classList.remove('on');
   document.getElementById('ov-draw').classList.remove('on');
@@ -1170,6 +1215,8 @@ function startGame(ai){
     document.getElementById('lbl-black').textContent='Чорні';
     addLog('▶ Гра двох гравців.','eg');
   }
+  // Record starting position
+  recordPosition(board, turn, epTarget);
   buildBoard();
   renderBoard(board,null,[],null,null);
   updateUI();
