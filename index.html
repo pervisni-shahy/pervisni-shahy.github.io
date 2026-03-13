@@ -1094,7 +1094,7 @@ function execMove(from,to,m,isAI=false){
   else halfMoveClock++;
 
   // Log
-  const sym={white:{king:'♔',queen:'♕',pawn:'♙'},black:{king:'♚',queen:'♛',pawn:'♟'}};
+  const sym={white:{king:'♔',queen:'♕',pawn:'♙',knight:'♘',bishop:'♗',rook:'♖'},black:{king:'♚',queen:'♛',pawn:'♟',knight:'♞',bishop:'♝',rook:'♜'}};
   const promSymsLog={queen:'♕',rook:'♖',bishop:'♗',knight:'♘'};
   const promSymsLogB={queen:'♛',rook:'♜',bishop:'♝',knight:'♞'};
   const promName=promoted?(piece.color==='white'?promSymsLog:promSymsLogB)[aiPromType||'queen']:'';
