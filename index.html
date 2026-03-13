@@ -354,6 +354,37 @@ body::before {
 .rep-btn:disabled{opacity:.3;cursor:not-allowed}
 #rep-label{font-family:'Cormorant Garamond',serif;font-size:.85rem;color:var(--amber-dim);
   min-width:80px;text-align:center;flex-shrink:0}
+
+/* ===== PROMOTION OVERLAY ===== */
+#ov-promo .ov-box { max-width:340px; }
+.promo-pieces {
+  display:flex; gap:10px; justify-content:center;
+  margin:8px 0 4px;
+}
+.promo-cell {
+  width:68px; height:68px;
+  border:2px solid var(--border);
+  border-radius:8px;
+  background:linear-gradient(140deg,rgba(18,28,16,.9),rgba(10,18,10,.9));
+  cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;
+  transition:all .2s cubic-bezier(.34,1.56,.64,1);
+  padding:6px;
+}
+.promo-cell:hover {
+  border-color:var(--amber);
+  background:rgba(180,130,40,.12);
+  transform:translateY(-4px) scale(1.08);
+  box-shadow:0 8px 24px rgba(180,130,40,.25);
+}
+.promo-cell svg { width:46px; height:46px; }
+.promo-label {
+  font-family:'Josefin Sans',sans-serif;
+  font-size:.55rem; font-weight:600;
+  letter-spacing:.08em; text-transform:uppercase;
+  color:var(--amber-dim);
+}
 </style>
 </head>
 <body>
@@ -446,6 +477,18 @@ body::before {
   </div>
 </div>
 
+
+<!-- PROMOTION overlay -->
+<div id="ov-promo" class="ov">
+  <div class="ov-box">
+    <div class="ov-icon">👑</div>
+    <h2 class="ov-title">Перетворення!</h2>
+    <div class="ov-rule"></div>
+    <p class="ov-msg">Оберіть фігуру для перетворення пішня</p>
+    <div class="promo-pieces" id="promo-choices"></div>
+  </div>
+</div>
+
 <!-- SURRENDER CONFIRM overlay -->
 <div id="ov-sur" class="ov">
   <div class="ov-box">
@@ -509,6 +552,28 @@ const PAWN_PATHS = `
   <rect x="14" y="31" width="17" height="3" rx="1.5"/>
   <rect x="12" y="34" width="21" height="2.5" rx="1.2"/>
 `;
+const KNIGHT_PATHS = `
+  <path d="M 22,10 C 20,8 16,8 14,10 C 12,12 12,15 14,17 L 12,28 L 33,28 L 31,18 C 33,16 34,13 32,11 C 30,9 27,9 25,10 C 24,10 23,10 22,10 Z"/>
+  <circle cx="18" cy="15" r="2" fill="rgba(0,0,0,0.35)"/>
+  <path d="M 14,17 C 16,19 20,19 22,17"/>
+  <rect x="11" y="30" width="23" height="3" rx="1.5"/>
+  <rect x="9"  y="33" width="27" height="2.5" rx="1.2"/>
+`;
+const BISHOP_PATHS = `
+  <circle cx="22.5" cy="9" r="3.5"/>
+  <path d="M 18,14 C 16,17 16,21 18,24 L 27,24 C 29,21 29,17 27,14 Z"/>
+  <line x1="22.5" y1="6" x2="22.5" y2="24" stroke-width="0.9"/>
+  <rect x="14" y="27" width="17" height="3" rx="1.5"/>
+  <rect x="12" y="30" width="21" height="2.5" rx="1.2"/>
+`;
+const ROOK_PATHS = `
+  <rect x="14" y="15" width="17" height="14" rx="1"/>
+  <rect x="13" y="11" width="4"  height="6" rx="0.8"/>
+  <rect x="20.5" y="11" width="4" height="6" rx="0.8"/>
+  <rect x="28" y="11" width="4"  height="6" rx="0.8"/>
+  <rect x="12" y="31" width="21" height="3" rx="1.5"/>
+  <rect x="10" y="34" width="25" height="2.5" rx="1.2"/>
+`;
 const KING_PATHS = `
   <line x1="22.5" y1="5" x2="22.5" y2="11" stroke-width="1.8"/>
   <line x1="19.5" y1="7.5" x2="25.5" y2="7.5" stroke-width="1.8"/>
@@ -530,9 +595,12 @@ const QUEEN_PATHS = `
 
 function pieceSVG(type, color) {
   const w = color === 'white';
-  if (type === 'pawn')  return mkSVG(PAWN_PATHS, w);
-  if (type === 'king')  return mkSVG(KING_PATHS, w);
-  if (type === 'queen') return mkSVG(QUEEN_PATHS, w);
+  if (type === 'pawn')   return mkSVG(PAWN_PATHS, w);
+  if (type === 'knight') return mkSVG(KNIGHT_PATHS, w);
+  if (type === 'bishop') return mkSVG(BISHOP_PATHS, w);
+  if (type === 'rook')   return mkSVG(ROOK_PATHS, w);
+  if (type === 'king')   return mkSVG(KING_PATHS, w);
+  if (type === 'queen')  return mkSVG(QUEEN_PATHS, w);
   return '';
 }
 
@@ -708,7 +776,7 @@ function snapBoard(b) { return b.map(r=>r.map(c=>c?{...c}:null)); }
 function posKey(b, turn, ep) {
   // Compact board string + turn + en-passant column
   let k = turn[0]; // 'w' or 'b'
-  const sym = {king:'K',queen:'Q',pawn:'P'};
+  const sym = {king:'K',queen:'Q',pawn:'P',knight:'N',bishop:'B',rook:'R'};
   const col = {white:'W',black:'B'};
   for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
     const p=b[r][c];
@@ -785,11 +853,38 @@ function queenMoves(b,r,c,color){
   }
   return ms;
 }
+function slideMoves(b,r,c,color,dirs){
+  const ms=[];
+  for(const[dr,dc] of dirs){
+    let nr=r+dr,nc=c+dc;
+    while(nr>=0&&nr<8&&nc>=0&&nc<8){
+      if(!b[nr][nc]){ms.push({row:nr,col:nc,kind:'move'})}
+      else{if(b[nr][nc].color!==color) ms.push({row:nr,col:nc,kind:'capture'});break}
+      nr+=dr;nc+=dc;
+    }
+  }
+  return ms;
+}
+function knightMoves(b,r,c,color){
+  return [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]
+    .map(([dr,dc])=>({row:r+dr,col:c+dc}))
+    .filter(({row:nr,col:nc})=>nr>=0&&nr<8&&nc>=0&&nc<8&&(!b[nr][nc]||b[nr][nc].color!==color))
+    .map(({row:nr,col:nc})=>({row:nr,col:nc,kind:b[nr][nc]?'capture':'move'}));
+}
+function bishopMoves(b,r,c,color){
+  return slideMoves(b,r,c,color,[[-1,-1],[-1,1],[1,-1],[1,1]]);
+}
+function rookMoves(b,r,c,color){
+  return slideMoves(b,r,c,color,[[-1,0],[1,0],[0,-1],[0,1]]);
+}
 function rawMoves(b,r,c,ep){
   const p=b[r][c]; if(!p) return [];
-  if(p.type==='pawn')  return pawnMoves(b,r,c,p.color,ep);
-  if(p.type==='king')  return kingMoves(b,r,c,p.color);
-  if(p.type==='queen') return queenMoves(b,r,c,p.color);
+  if(p.type==='pawn')   return pawnMoves(b,r,c,p.color,ep);
+  if(p.type==='knight') return knightMoves(b,r,c,p.color);
+  if(p.type==='bishop') return bishopMoves(b,r,c,p.color);
+  if(p.type==='rook')   return rookMoves(b,r,c,p.color);
+  if(p.type==='king')   return kingMoves(b,r,c,p.color);
+  if(p.type==='queen')  return queenMoves(b,r,c,p.color);
   return [];
 }
 function isAttacked(b,r,c,byColor){
@@ -812,22 +907,31 @@ function inCheck(b,color){
   const k=findKing(b,color); if(!k) return false;
   return isAttacked(b,k.row,k.col,color==='white'?'black':'white');
 }
-function applyMove(b,from,to,m,ep){
+function applyMove(b,from,to,m,ep,promType){
   const nb=b.map(r=>r.map(c=>c?{...c}:null));
   const p={...nb[from.row][from.col],hasMoved:true};
   if(m.kind==='enpassant') nb[from.row][to.col]=null;
   nb[to.row][to.col]=p;
   nb[from.row][from.col]=null;
-  if(p.type==='pawn'){
-    if(p.color==='white'&&to.row===0) nb[to.row][to.col]={type:'queen',color:'white',hasMoved:true};
-    if(p.color==='black'&&to.row===7) nb[to.row][to.col]={type:'queen',color:'black',hasMoved:true};
+  // Promotion — use promType if given, else skip (will be set later)
+  if(p.type==='pawn' && promType){
+    if(p.color==='white'&&to.row===0) nb[to.row][to.col]={type:promType,color:'white',hasMoved:true};
+    if(p.color==='black'&&to.row===7) nb[to.row][to.col]={type:promType,color:'black',hasMoved:true};
   }
   return nb;
+}
+
+function isPromoMove(b,from,to){
+  const p=b[from.row][from.col];
+  if(!p||p.type!=='pawn') return false;
+  return (p.color==='white'&&to.row===0)||(p.color==='black'&&to.row===7);
 }
 function legalMoves(b,r,c,ep){
   const p=b[r][c]; if(!p) return [];
   return rawMoves(b,r,c,ep).filter(m=>{
-    const nb=applyMove(b,{row:r,col:c},{row:m.row,col:m.col},m,ep);
+    // For pawn promotion, try queen to test legality
+    const pt = (p.type==='pawn' && ((p.color==='white'&&m.row===0)||(p.color==='black'&&m.row===7))) ? 'queen' : null;
+    const nb=applyMove(b,{row:r,col:c},{row:m.row,col:m.col},m,ep,pt);
     return !inCheck(nb,p.color);
   });
 }
@@ -917,6 +1021,27 @@ function onCell(r,c){
 // ================================================================
 //  EXECUTE MOVE
 // ================================================================
+// Pending promotion state
+let pendingPromo = null; // {from, to, m, color}
+
+function showPromoDialog(color, callback) {
+  const choices = ['queen','rook','bishop','knight'];
+  const labels  = ['Ферзь','Тура','Слон','Кінь'];
+  const el = document.getElementById('promo-choices');
+  el.innerHTML = '';
+  choices.forEach((type, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'promo-cell';
+    cell.innerHTML = `<div style="width:46px;height:46px">${pieceSVG(type, color==='white')}</div><span class="promo-label">${labels[i]}</span>`;
+    cell.addEventListener('click', () => {
+      document.getElementById('ov-promo').classList.remove('on');
+      callback(type);
+    });
+    el.appendChild(cell);
+  });
+  document.getElementById('ov-promo').classList.add('on');
+}
+
 function execMove(from,to,m,isAI=false){
   const piece=board[from.row][from.col];
   const captured=board[to.row][to.col];
@@ -930,11 +1055,38 @@ function execMove(from,to,m,isAI=false){
     check: inCheck(board,turn)
   });
 
-  board=applyMove(board,from,to,m,epTarget);
+  // Check if this is a promotion move
+  const needsPromo = isPromoMove(board, from, to);
+
+  if(needsPromo && !isAI){
+    // Apply move without promotion first (pawn stays for now)
+    board=applyMove(board,from,to,m,epTarget,null);
+    epTarget=m.kind==='double'?{row:from.row+(piece.color==='white'?-1:1),col:from.col}:null;
+    lastMove={from,to};
+    if(isCapture||piece.type==='pawn') halfMoveClock=0; else halfMoveClock++;
+    renderBoard(board,null,[],lastMove,null);
+    // Show dialog then finish move
+    showPromoDialog(piece.color, (promType) => {
+      board[to.row][to.col]={type:promType,color:piece.color,hasMoved:true};
+      const promSyms={queen:'♕',rook:'♖',bishop:'♗',knight:'♘'};
+      const promSymsB={queen:'♛',rook:'♜',bishop:'♝',knight:'♞'};
+      const sym2=piece.color==='white'?promSyms:promSymsB;
+      const logSym={white:{king:'♔',queen:'♕',pawn:'♙'},black:{king:'♚',queen:'♛',pawn:'♟'}};
+      const s=`${piece.color==='white'?`${fmn}. `:''}${logSym[piece.color][piece.type]} ${toAN(from.row,from.col)}${isCapture?'×':'-'}${toAN(to.row,to.col)} =${sym2[promType]}`;
+      if(piece.color==='white') fmn++;
+      addLog(s, piece.color==='white'?'wm':'bm');
+      finishMove(piece, isCapture, true, promType, isAI);
+    });
+    return;
+  }
+
+  // AI promotion → always queen
+  const aiPromType = (needsPromo && isAI) ? 'queen' : null;
+  board=applyMove(board,from,to,m,epTarget, aiPromType || null);
   epTarget=m.kind==='double'
     ?{row:from.row+(piece.color==='white'?-1:1),col:from.col}
     :null;
-  const promoted=board[to.row][to.col]?.type==='queen'&&piece.type==='pawn';
+  const promoted = needsPromo;
   lastMove={from,to};
 
   // 50-move rule: reset on capture or pawn move
@@ -943,10 +1095,17 @@ function execMove(from,to,m,isAI=false){
 
   // Log
   const sym={white:{king:'♔',queen:'♕',pawn:'♙'},black:{king:'♚',queen:'♛',pawn:'♟'}};
-  const s=`${piece.color==='white'?`${fmn}. `:''}${sym[piece.color][piece.type]} ${toAN(from.row,from.col)}${isCapture?'×':'-'}${toAN(to.row,to.col)}${promoted?' =♕ (пішень→ферзь)':''}`;
+  const promSymsLog={queen:'♕',rook:'♖',bishop:'♗',knight:'♘'};
+  const promSymsLogB={queen:'♛',rook:'♜',bishop:'♝',knight:'♞'};
+  const promName=promoted?(piece.color==='white'?promSymsLog:promSymsLogB)[aiPromType||'queen']:'';
+  const s=`${piece.color==='white'?`${fmn}. `:''}${sym[piece.color][piece.type]} ${toAN(from.row,from.col)}${isCapture?'×':'-'}${toAN(to.row,to.col)}${promoted?' ='+promName:''}`;
   if(piece.color==='white') fmn++;
   addLog(s, isAI?'bm ai':(piece.color==='white'?'wm':'bm'));
 
+  finishMove(piece, isCapture, promoted, aiPromType, isAI);
+}
+
+function finishMove(piece, isCapture, promoted, promType, isAI){
   turn=turn==='white'?'black':'white';
   const chk=inCheck(board,turn), hasMvs=hasLegal(board,turn,epTarget);
 
@@ -956,7 +1115,7 @@ function execMove(from,to,m,isAI=false){
   else playMove();
 
   // ── 50-MOVE RULE ─────────────────────────────────────────
-  if(halfMoveClock>=100){ // 100 half-moves = 50 full moves
+  if(halfMoveClock>=100){
     history.push({board:snapBoard(board),from:null,to:null,turn,ep:{},check:false});
     addLog('= Нічия — правило 50 ходів','eg'); gameOver=true;
     renderBoard(board,null,[],lastMove,null); updateUI();
@@ -975,7 +1134,6 @@ function execMove(from,to,m,isAI=false){
   }
 
   if(chk&&!hasMvs){
-    // Checkmate - save final state too
     history.push({board:snapBoard(board),from:null,to:null,turn,ep:{},check:true});
     const winner=turn==='white'?'Чорні':'Білі';
     const loser =turn==='white'?'білим':'чорним';
@@ -987,9 +1145,12 @@ function execMove(from,to,m,isAI=false){
     return;
   } else if(!hasMvs){
     history.push({board:snapBoard(board),from:null,to:null,turn,ep:{},check:false});
-    addLog('= Пат — нічия','eg'); gameOver=true;
+    const winner=turn==='white'?'Чорні':'Білі';
+    const loserName=turn==='white'?'Білі':'Чорні';
+    addLog(`♚ ${loserName} не мають безпечних ходів — Король захоплено!`,'eg');
+    gameOver=true;
     renderBoard(board,null,[],lastMove,null); updateUI();
-    setTimeout(()=>showResult('Пат','Нічия через пат','🤝'),400);
+    setTimeout(()=>{playCheckmate();showResult('Короля захоплено!',`${loserName} не мали безпечного ходу. ${winner} перемагають!`,'♟')},500);
     return;
   } else if(chk){
     playCheck(); addLog(`⚠ Шах ${turn==='white'?'білим':'чорним'}!`,'ec');
@@ -1185,7 +1346,7 @@ function doAI(){
       if(sc>best||(sc===best&&Math.random()<.15)){best=sc;bFrom={row:r,col:c};bTo={row:m.row,col:m.col};bM=m}
     }
   }
-  if(bFrom){addLog('🤖 ШІ обрав хід','ai');execMove(bFrom,bTo,bM,true)}
+  if(bFrom){execMove(bFrom,bTo,bM,true)}
 }
 
 // ================================================================
