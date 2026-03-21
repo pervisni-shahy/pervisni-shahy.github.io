@@ -1025,21 +1025,8 @@ function onCell(r,c){
 let pendingPromo = null; // {from, to, m, color}
 
 function showPromoDialog(color, callback) {
-  const choices = ['queen','rook','bishop','knight'];
-  const labels  = ['Ферзь','Тура','Слон','Кінь'];
-  const el = document.getElementById('promo-choices');
-  el.innerHTML = '';
-  choices.forEach((type, i) => {
-    const cell = document.createElement('div');
-    cell.className = 'promo-cell';
-    cell.innerHTML = `<div style="width:46px;height:46px">${pieceSVG(type, color==='white')}</div><span class="promo-label">${labels[i]}</span>`;
-    cell.addEventListener('click', () => {
-      document.getElementById('ov-promo').classList.remove('on');
-      callback(type);
-    });
-    el.appendChild(cell);
-  });
-  document.getElementById('ov-promo').classList.add('on');
+  // Auto-promote to queen
+  callback('queen');
 }
 
 function execMove(from,to,m,isAI=false){
